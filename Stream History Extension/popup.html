@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Twitch Watch History</title>
+    <style>
+      body {
+        box-sizing: border-box;
+        width: 320px;
+        margin: 0;
+        background: #0e0e10;
+        color: #efeff1;
+        font-family: Arial, sans-serif;
+      }
+
+      main {
+        padding: 14px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+
+      .summary {
+        color: #adadb8;
+        margin-bottom: 12px;
+      }
+
+      .actions {
+        display: grid;
+        gap: 8px;
+      }
+
+      button,
+      a {
+        border: 0;
+        border-radius: 6px;
+        background: #9147ff;
+        color: #ffffff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 12px;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      button.secondary {
+        background: #2f2f35;
+      }
+
+      button.danger {
+        background: #ad2930;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Twitch History</h1>
+      <div class="summary" id="summary">Lade...</div>
+      <div class="actions">
+        <a href="https://www.twitch.tv/directory/following/channels" target="_blank">Following-Kanaele oeffnen</a>
+        <button class="secondary" id="refresh" type="button">Aktualisieren</button>
+        <button class="danger" id="clear" type="button">History loeschen</button>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
