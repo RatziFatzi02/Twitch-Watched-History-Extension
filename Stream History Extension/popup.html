@@ -28,9 +28,20 @@
         margin-bottom: 12px;
       }
 
-      .actions {
+      .actions,
+      .oauth {
         display: grid;
         gap: 8px;
+      }
+
+      .oauth {
+        margin: 12px 0;
+      }
+
+      .hint {
+        color: #adadb8;
+        font-size: 11px;
+        overflow-wrap: anywhere;
       }
 
       button,
@@ -57,16 +68,27 @@
       button.danger {
         background: #ad2930;
       }
+
+      button.connected {
+        background: #00a884;
+        box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.28), 0 0 14px rgba(0, 168, 132, 0.55);
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Twitch History</h1>
       <div class="summary" id="summary">Lade...</div>
+      <section class="oauth">
+        <div class="hint" id="auth-status">OAuth nicht verbunden.</div>
+        <div class="hint">Redirect URL: <span id="redirect-url">...</span></div>
+        <button id="connect-twitch" type="button">Mit Twitch verbinden</button>
+        <button class="secondary" id="sync-live" type="button">Live-Status per API prüfen</button>
+      </section>
       <div class="actions">
-        <a href="https://www.twitch.tv/directory/following/channels" target="_blank">Following-Kanaele oeffnen</a>
+        <a href="https://www.twitch.tv/directory/following/channels" target="_blank">Following-Kanäle öffnen</a>
         <button class="secondary" id="refresh" type="button">Aktualisieren</button>
-        <button class="danger" id="clear" type="button">History loeschen</button>
+        <button class="danger" id="clear" type="button">History löschen</button>
       </div>
     </main>
     <script src="popup.js"></script>
