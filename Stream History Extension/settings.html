@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Twitch Watch History Einstellungen</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0e0e10;
+        color: #efeff1;
+        font-family: Arial, sans-serif;
+      }
+
+      main {
+        width: min(1040px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      header {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.15;
+      }
+
+      h2 {
+        font-size: 18px;
+      }
+
+      .muted,
+      .status {
+        color: #adadb8;
+      }
+
+      .status {
+        min-height: 18px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        align-items: start;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .panel {
+        border: 1px solid #2f2f35;
+        border-radius: 8px;
+        background: #18181b;
+        padding: 18px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .panel-header p {
+        margin-top: 4px;
+        font-size: 13px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .backup-auto-grid {
+        border-top: 1px solid #2f2f35;
+        margin-top: 14px;
+        padding-top: 14px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .stat {
+        border: 1px solid #2f2f35;
+        border-radius: 6px;
+        background: #0e0e10;
+        padding: 12px;
+      }
+
+      .stat span {
+        display: block;
+        color: #adadb8;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 5px;
+        color: #ffffff;
+        font-size: 20px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      label {
+        color: #adadb8;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      code,
+      .readonly {
+        border: 1px solid #3a3a3d;
+        border-radius: 6px;
+        background: #0e0e10;
+        color: #efeff1;
+        padding: 10px;
+        overflow-wrap: anywhere;
+      }
+
+      .readonly {
+        min-height: 38px;
+        font-size: 13px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button,
+      a.button {
+        border: 0;
+        border-radius: 6px;
+        background: #9147ff;
+        color: #ffffff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        padding: 0 14px;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      button.secondary,
+      a.button.secondary {
+        background: #2f2f35;
+      }
+
+      button.danger {
+        background: #ad2930;
+      }
+
+      button.connected {
+        background: #00a884;
+        box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.24), 0 0 14px rgba(0, 168, 132, 0.48);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      input[type="text"],
+      select {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid #3a3a3d;
+        border-radius: 6px;
+        background: #0e0e10;
+        color: #efeff1;
+        padding: 0 10px;
+        font: inherit;
+      }
+
+      input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #9147ff;
+      }
+
+      .check-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .check-row label {
+        color: #efeff1;
+        font-size: 14px;
+      }
+
+      .recent-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .recent-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        border-top: 1px solid #2f2f35;
+        padding-top: 8px;
+      }
+
+      .recent-item:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .recent-item strong,
+      .recent-item span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .recent-item span {
+        color: #adadb8;
+        font-size: 12px;
+      }
+
+      @media (max-width: 820px) {
+        .layout,
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Twitch Watch History Einstellungen</h1>
+        <p class="muted">Verwalte OAuth, API-Sync, lokale History und Backups an einem Ort.</p>
+      </header>
+
+      <div class="layout">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Übersicht</h2>
+                <p class="muted">Aktueller lokaler Datenbestand.</p>
+              </div>
+              <button class="secondary" id="refresh" type="button">Aktualisieren</button>
+            </div>
+            <div class="stats">
+              <div class="stat">
+                <span>Kanäle</span>
+                <strong id="stat-channels">-</strong>
+              </div>
+              <div class="stat">
+                <span>Watchtime</span>
+                <strong id="stat-watchtime">-</strong>
+              </div>
+              <div class="stat">
+                <span>Sessions</span>
+                <strong id="stat-sessions">-</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Twitch OAuth</h2>
+                <p class="muted">Verbindung zur Twitch Helix API für Live-Status, Zuschauerzahlen und Profilbilder.</p>
+              </div>
+              <button id="connect-twitch" type="button">Mit Twitch verbinden</button>
+            </div>
+            <div class="grid">
+              <div class="status" id="auth-status">OAuth Status wird geladen...</div>
+              <div class="field">
+                <label for="redirect-url">Redirect URL</label>
+                <div class="readonly" id="redirect-url">...</div>
+              </div>
+              <div class="actions">
+                <button class="secondary" id="sync-live" type="button">Live-Status per API prüfen</button>
+              </div>
+              <div class="status" id="sync-status" aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Backup</h2>
+                <p class="muted">Exportiere, importiere oder sichere deine lokale Watch-History automatisch.</p>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="export-history" type="button">History exportieren</button>
+              <button class="secondary" id="import-history" type="button">History importieren</button>
+              <input id="import-history-file" type="file" accept="application/json,.json">
+            </div>
+            <div class="status" id="backup-status" aria-live="polite"></div>
+
+            <div class="grid backup-auto-grid">
+              <div class="check-row">
+                <input id="auto-backup-enabled" type="checkbox">
+                <label for="auto-backup-enabled">Auto-Backup aktivieren</label>
+              </div>
+              <div class="field">
+                <label for="auto-backup-interval">Intervall</label>
+                <select id="auto-backup-interval">
+                  <option value="60">Stündlich</option>
+                  <option value="360">Alle 6 Stunden</option>
+                  <option value="720">Alle 12 Stunden</option>
+                  <option value="1440">Täglich</option>
+                  <option value="10080">Wöchentlich</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="auto-backup-filename">Datei im Downloads-Ordner</label>
+                <input id="auto-backup-filename" type="text" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="actions">
+                <button class="secondary" id="save-auto-backup" type="button">Auto-Backup speichern</button>
+                <button class="secondary" id="run-auto-backup" type="button">Jetzt sichern</button>
+              </div>
+              <div class="status" id="auto-backup-status" aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Gefahrenzone</h2>
+                <p class="muted">Löscht nur lokale Extension-Daten. Dein Twitch-Konto bleibt unverändert.</p>
+              </div>
+              <button class="danger" id="clear" type="button">History löschen</button>
+            </div>
+            <div class="status" id="danger-status" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <aside class="stack">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Schnellzugriff</h2>
+                <p class="muted">Direkt zu den relevanten Twitch-Seiten.</p>
+              </div>
+            </div>
+            <div class="grid">
+              <a class="button" href="https://www.twitch.tv/directory/following/history" target="_blank" rel="noopener">History öffnen</a>
+              <a class="button secondary" href="https://www.twitch.tv/directory/following/channels" target="_blank" rel="noopener">Following-Kanäle öffnen</a>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Zuletzt gesehen</h2>
+                <p class="muted">Die letzten lokalen Einträge.</p>
+              </div>
+            </div>
+            <div class="recent-list" id="recent-list"></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+    <script src="settings.js"></script>
+  </body>
+</html>

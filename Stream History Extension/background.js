@@ -7,6 +7,11 @@ const MAX_PREVIEW_DATA_URL_LENGTH = 220000;
 const MAX_RECENT_CATEGORIES = 5;
 const MAX_RECENT_TAGS = 12;
 const FOLLOWING_CHECKED_AT_KEY = "twhFollowingCheckedAt";
+const AUTO_BACKUP_SETTINGS_KEY = "twhAutoBackupSettings";
+const AUTO_BACKUP_STATE_KEY = "twhAutoBackupState";
+const AUTO_BACKUP_ALARM_NAME = "twhAutoBackupAlarm";
+const DEFAULT_AUTO_BACKUP_FILENAME = "Twitch Watch History Backups/twitch-watch-history-autobackup.json";
+const DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES = 360;
 
 const INTERNAL_TWITCH_PATHS = new Set([
   "directory",
@@ -111,6 +116,22 @@ function launchWebAuthFlow(details) {
       resolve(redirectUrl);
     });
   });
+}
+
+function downloadFile(details) {
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download(details, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(downloadId);
+    });
+  });
+}
+
+function clearAlarm(name) {
+  return new Promise((resolve) => chrome.alarms.clear(name, resolve));
 }
 
 function parseTwitchChannelUrl(urlValue) {
@@ -250,6 +271,309 @@ async function readHistory() {
 
 async function writeHistory(history) {
   await storageSet({ [HISTORY_KEY]: history });
+}
+
+function normalizeHistoryImportKey(rawKey, item) {
+  const candidates = [
+    rawKey,
+    item && item.channelKey,
+    item && item.channelName,
+    item && item.displayName
+  ];
+
+  for (const candidate of candidates) {
+    const key = String(candidate || "").trim().toLowerCase();
+    if (/^[a-z0-9_]{3,25}$/.test(key) && !INTERNAL_TWITCH_PATHS.has(key)) {
+      return key;
+    }
+  }
+
+  const parsed = parseTwitchChannelUrl(item && item.lastUrl);
+  return parsed ? parsed.key : "";
+}
+
+function normalizeImportedDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? new Date(time).toISOString() : "";
+}
+
+function normalizeImportedText(value, maxLength = 300) {
+  const clean = String(value || "").replace(/\s+/g, " ").trim();
+  return clean.length > maxLength ? clean.slice(0, maxLength) : clean;
+}
+
+function normalizeImportedCategories(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((category) => {
+      const name = normalizeCategoryName(category && category.name);
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        url: normalizeImportedText(category.url, 1000),
+        lastSeenAt: normalizeImportedDate(category.lastSeenAt)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_RECENT_CATEGORIES);
+}
+
+function normalizeImportedTags(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((tag) => {
+      const source = typeof tag === "string" ? { name: tag } : tag;
+      const name = normalizeTagName(source && source.name);
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        lastSeenAt: normalizeImportedDate(source.lastSeenAt)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_RECENT_TAGS);
+}
+
+function normalizeImportedHistoryRecord(rawKey, item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+
+  const channelKey = normalizeHistoryImportKey(rawKey, item);
+  if (!channelKey) {
+    return null;
+  }
+
+  const nowIso = new Date().toISOString();
+  const channelName = normalizeImportedText(item.channelName || channelKey, 25) || channelKey;
+  const displayName = normalizeImportedText(item.displayName || channelName, 80) || channelName;
+  const totalWatchSeconds = Math.max(0, Math.floor(Number(item.totalWatchSeconds || 0)));
+  const sessionCount = Math.max(0, Math.floor(Number(item.sessionCount || 0)));
+  const viewerCount = normalizeViewerCount(item.viewerCount);
+  const previewImageDataUrl = isSafePreviewDataUrl(item.previewImageDataUrl) ? item.previewImageDataUrl : "";
+  const profileImageUrl = isSafeRemoteImageUrl(item.profileImageUrl) ? item.profileImageUrl : "";
+  const bannerImageUrl = isSafeRemoteImageUrl(item.bannerImageUrl) ? item.bannerImageUrl : "";
+  const firstSeenAt = normalizeImportedDate(item.firstSeenAt) || normalizeImportedDate(item.lastSeenAt) || nowIso;
+  const lastSeenAt = normalizeImportedDate(item.lastSeenAt) || firstSeenAt;
+
+  return {
+    channelKey,
+    record: {
+      channelName,
+      displayName,
+      firstSeenAt,
+      lastSeenAt,
+      totalWatchSeconds,
+      sessionCount,
+      lastUrl: normalizeImportedText(item.lastUrl || `https://www.twitch.tv/${channelKey}`, 1000),
+      pageTitle: normalizeImportedText(item.pageTitle, 300),
+      lastStreamTitle: normalizeStreamTitle(item.lastStreamTitle),
+      isLive: item.isLive === true,
+      liveStatusCheckedAt: normalizeImportedDate(item.liveStatusCheckedAt),
+      viewerCount,
+      viewerCountCheckedAt: viewerCount !== null ? normalizeImportedDate(item.viewerCountCheckedAt) : "",
+      profileImageUrl,
+      profileCapturedAt: profileImageUrl ? normalizeImportedDate(item.profileCapturedAt) : "",
+      bannerImageUrl,
+      imagesVerifiedAt: profileImageUrl || bannerImageUrl ? normalizeImportedDate(item.imagesVerifiedAt) || nowIso : "",
+      previewImageDataUrl,
+      previewCapturedAt: previewImageDataUrl ? normalizeImportedDate(item.previewCapturedAt) || nowIso : "",
+      recentCategories: normalizeImportedCategories(item.recentCategories),
+      recentTags: normalizeImportedTags(item.recentTags),
+      isFollowing: item.isFollowing === true,
+      followingCheckedAt: item.isFollowing === true ? normalizeImportedDate(item.followingCheckedAt) : ""
+    }
+  };
+}
+
+function extractHistoryFromImportPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Import-Datei ist kein gültiges JSON-Objekt.");
+  }
+
+  if (payload.history && typeof payload.history === "object" && !Array.isArray(payload.history)) {
+    return payload.history;
+  }
+
+  if (Array.isArray(payload.items)) {
+    return Object.fromEntries(payload.items.map((item) => [item && (item.channelKey || item.channelName), item]));
+  }
+
+  if (Array.isArray(payload)) {
+    return Object.fromEntries(payload.map((item) => [item && (item.channelKey || item.channelName), item]));
+  }
+
+  return payload;
+}
+
+async function exportHistoryData() {
+  await flushAllActive({ continueWatching: true });
+  const history = await readHistory();
+  return {
+    app: "twitch-watch-history",
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    itemCount: Object.keys(history).length,
+    history
+  };
+}
+
+async function importHistoryData(payload) {
+  const rawHistory = extractHistoryFromImportPayload(payload);
+  const importedHistory = {};
+
+  for (const [key, item] of Object.entries(rawHistory)) {
+    const normalized = normalizeImportedHistoryRecord(key, item);
+    if (normalized) {
+      importedHistory[normalized.channelKey] = normalized.record;
+    }
+  }
+
+  const importedCount = Object.keys(importedHistory).length;
+  if (importedCount === 0) {
+    throw new Error("Import-Datei enthält keine gültigen Twitch-History-Einträge.");
+  }
+
+  await flushAllActive({ continueWatching: true });
+  const currentHistory = await readHistory();
+  const nextHistory = {
+    ...currentHistory,
+    ...importedHistory
+  };
+
+  await writeHistory(nextHistory);
+  return {
+    imported: importedCount,
+    total: Object.keys(nextHistory).length
+  };
+}
+
+function normalizeBackupFilename(value) {
+  const clean = String(value || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim().replace(/[<>:"|?*]/g, "-"))
+    .filter((part) => part && part !== "." && part !== "..")
+    .join("/")
+    .slice(0, 180);
+
+  if (!clean) {
+    return DEFAULT_AUTO_BACKUP_FILENAME;
+  }
+
+  return /\.json$/i.test(clean) ? clean : `${clean}.json`;
+}
+
+function normalizeAutoBackupSettings(value) {
+  const intervalMinutes = Math.max(60, Math.min(10080, Math.round(Number(value && value.intervalMinutes) || DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)));
+  return {
+    enabled: value && value.enabled === true,
+    intervalMinutes,
+    filename: normalizeBackupFilename(value && value.filename)
+  };
+}
+
+async function readAutoBackupSettings() {
+  const result = await storageGet(AUTO_BACKUP_SETTINGS_KEY);
+  return normalizeAutoBackupSettings(result[AUTO_BACKUP_SETTINGS_KEY]);
+}
+
+async function readAutoBackupState() {
+  const result = await storageGet(AUTO_BACKUP_STATE_KEY);
+  return result[AUTO_BACKUP_STATE_KEY] || {};
+}
+
+async function writeAutoBackupState(state) {
+  await storageSet({ [AUTO_BACKUP_STATE_KEY]: state || {} });
+}
+
+async function scheduleAutoBackupAlarm() {
+  const settings = await readAutoBackupSettings();
+  await clearAlarm(AUTO_BACKUP_ALARM_NAME);
+
+  if (!settings.enabled) {
+    return settings;
+  }
+
+  chrome.alarms.create(AUTO_BACKUP_ALARM_NAME, {
+    delayInMinutes: settings.intervalMinutes,
+    periodInMinutes: settings.intervalMinutes
+  });
+  return settings;
+}
+
+async function writeAutoBackupSettings(settings) {
+  const normalized = normalizeAutoBackupSettings(settings);
+  await storageSet({ [AUTO_BACKUP_SETTINGS_KEY]: normalized });
+  await scheduleAutoBackupAlarm();
+  return normalized;
+}
+
+async function getAutoBackupStatus() {
+  return {
+    settings: await readAutoBackupSettings(),
+    state: await readAutoBackupState()
+  };
+}
+
+async function runAutoBackup(reason = "manual") {
+  const settings = await readAutoBackupSettings();
+  if (!settings.enabled && reason !== "manual") {
+    return {
+      skipped: true,
+      reason: "disabled"
+    };
+  }
+
+  try {
+    const exportData = await exportHistoryData();
+    const payload = {
+      ...exportData,
+      backupType: reason === "manual" ? "manual" : "auto"
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const downloadId = await downloadFile({
+      url: `data:application/json;charset=utf-8,${encodeURIComponent(json)}`,
+      filename: settings.filename,
+      conflictAction: "overwrite",
+      saveAs: false
+    });
+    const state = {
+      lastBackupAt: new Date().toISOString(),
+      lastFilename: settings.filename,
+      lastItemCount: exportData.itemCount || 0,
+      lastReason: reason,
+      lastDownloadId: downloadId,
+      lastError: ""
+    };
+
+    await writeAutoBackupState(state);
+    return state;
+  } catch (error) {
+    const state = {
+      ...(await readAutoBackupState()),
+      lastError: error.message,
+      lastErrorAt: new Date().toISOString()
+    };
+    await writeAutoBackupState(state);
+    throw error;
+  }
 }
 
 async function hasVisitBeenCounted(visitId) {
@@ -822,11 +1146,13 @@ async function clearHistory() {
 chrome.runtime.onInstalled.addListener(async () => {
   const windowInfo = await getLastFocusedWindow();
   focusedWindowId = windowInfo ? windowInfo.id : null;
+  await scheduleAutoBackupAlarm();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   const windowInfo = await getLastFocusedWindow();
   focusedWindowId = windowInfo ? windowInfo.id : null;
+  await scheduleAutoBackupAlarm();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -1006,6 +1332,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
+    if (message.type === "TWH_EXPORT_HISTORY") {
+      try {
+        const exportData = await exportHistoryData();
+        sendResponse({ ok: true, exportData });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message });
+      }
+      return;
+    }
+
+    if (message.type === "TWH_IMPORT_HISTORY") {
+      try {
+        const result = await importHistoryData(message.payload);
+        sendResponse({ ok: true, result });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message });
+      }
+      return;
+    }
+
+    if (message.type === "TWH_GET_AUTO_BACKUP_STATUS") {
+      const status = await getAutoBackupStatus();
+      sendResponse({ ok: true, status });
+      return;
+    }
+
+    if (message.type === "TWH_SET_AUTO_BACKUP_SETTINGS") {
+      try {
+        const settings = await writeAutoBackupSettings(message.settings);
+        const state = await readAutoBackupState();
+        sendResponse({ ok: true, status: { settings, state } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message });
+      }
+      return;
+    }
+
+    if (message.type === "TWH_RUN_AUTO_BACKUP") {
+      try {
+        const result = await runAutoBackup("manual");
+        sendResponse({ ok: true, result });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message });
+      }
+      return;
+    }
+
     if (message.type === "TWH_CLEAR_HISTORY") {
       await clearHistory();
       sendResponse({ ok: true });
@@ -1060,6 +1433,16 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
       await reconcileTab(tabs[0].id);
     }
   }
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== AUTO_BACKUP_ALARM_NAME) {
+    return;
+  }
+
+  runAutoBackup("scheduled").catch(() => {
+    // The error is persisted in auto-backup state for the settings page.
+  });
 });
 
 setInterval(async () => {

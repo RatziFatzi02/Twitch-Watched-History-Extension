@@ -112,6 +112,7 @@
 }
 
 .twh-history-search-wrap {
+  position: relative;
   min-width: 0;
 }
 
@@ -157,6 +158,72 @@
 .twh-history-suggestions button:hover,
 .twh-history-suggestions button:focus {
   background: #3a3a3d;
+  color: #bf94ff;
+}
+
+.twh-history-autocomplete[hidden] {
+  display: none !important;
+}
+
+.twh-history-autocomplete {
+  position: absolute;
+  z-index: 20;
+  top: 43px;
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: min(340px, 48vh);
+  border: 1px solid #3a3a3d;
+  border-radius: 6px;
+  background: #18181b;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+  overflow: auto;
+  padding: 5px;
+}
+
+.twh-history-autocomplete button {
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #efeff1;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px;
+  text-align: left;
+  font: inherit;
+}
+
+.twh-history-autocomplete button:hover,
+.twh-history-autocomplete button:focus {
+  background: #2f2f35;
+  outline: none;
+}
+
+.twh-history-autocomplete-field,
+.twh-history-autocomplete-count {
+  color: #adadb8;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.twh-history-autocomplete-value {
+  min-width: 0;
+  overflow: hidden;
+  color: #efeff1;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twh-history-autocomplete button:hover .twh-history-autocomplete-field,
+.twh-history-autocomplete button:focus .twh-history-autocomplete-field {
   color: #bf94ff;
 }
 

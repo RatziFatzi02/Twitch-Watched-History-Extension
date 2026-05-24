@@ -1342,19 +1342,163 @@
       : [];
   }
 
+  function tokenizeSearchQuery(query) {
+    return String(query || "").match(/[a-zäöü_-]+:"[^"]*"|"[^"]+"|\S+/gi) || [];
+  }
+
   function parseSearchQuery(query) {
-    const parts = String(query || "").match(/"[^"]+"|\S+/g) || [];
+    const parts = tokenizeSearchQuery(query);
     return parts.map((part) => {
-      const clean = part.replace(/^"|"$/g, "").trim();
-      const match = clean.match(/^([a-zäöü_-]+):(.*)$/i);
+      const raw = part.trim();
+      const match = raw.match(/^([a-zäöü_-]+):(?:"([^"]*)"|(.*))$/i);
       if (!match) {
+        const clean = raw.replace(/^"|"$/g, "").trim();
         return { field: "any", value: clean.toLowerCase() };
       }
       return {
         field: match[1].toLowerCase(),
-        value: match[2].replace(/^"|"$/g, "").trim().toLowerCase()
+        value: String(match[2] ?? match[3] ?? "").trim().toLowerCase()
       };
     }).filter((token) => token.value);
+  }
+
+  function getActiveSearchFragment(query) {
+    const text = String(query || "");
+    const cursor = text.length;
+    let inQuote = false;
+    let start = 0;
+
+    for (let index = 0; index < cursor; index += 1) {
+      const char = text[index];
+      if (char === '"') {
+        inQuote = !inQuote;
+      } else if (!inQuote && /\s/.test(char)) {
+        start = index + 1;
+      }
+    }
+
+    const raw = text.slice(start, cursor);
+    const fieldMatch = raw.match(/^([a-zäöü_-]+):(?:"?([^"]*)?)$/i);
+    if (fieldMatch) {
+      return {
+        start,
+        raw,
+        field: fieldMatch[1].toLowerCase(),
+        value: String(fieldMatch[2] || "").toLowerCase()
+      };
+    }
+
+    return {
+      start,
+      raw,
+      field: "any",
+      value: raw.replace(/^"|"$/g, "").toLowerCase()
+    };
+  }
+
+  function quoteSearchValue(value) {
+    const clean = String(value || "").replace(/\s+/g, " ").trim().replaceAll('"', "");
+    if (/^[^\s:"]+$/.test(clean)) {
+      return clean;
+    }
+    return `"${clean}"`;
+  }
+
+  function makeSearchToken(field, value) {
+    if (!field || field === "any") {
+      return quoteSearchValue(value);
+    }
+    return `${field}:${quoteSearchValue(value)}`;
+  }
+
+  function replaceActiveSearchFragment(query, suggestion) {
+    const fragment = getActiveSearchFragment(query);
+    const token = makeSearchToken(suggestion.field, suggestion.value);
+    const before = String(query || "").slice(0, fragment.start).trimEnd();
+    return `${before ? `${before} ` : ""}${token} `;
+  }
+
+  function addSuggestionValue(map, field, label, value, sourceItem) {
+    const cleanValue = String(value || "").replace(/\s+/g, " ").trim();
+    if (!cleanValue) {
+      return;
+    }
+
+    const key = `${field}:${cleanValue.toLowerCase()}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.watchSeconds += Number(sourceItem.totalWatchSeconds || 0);
+      existing.lastSeenAt = Math.max(existing.lastSeenAt, new Date(sourceItem.lastSeenAt || 0).getTime());
+      return;
+    }
+
+    map.set(key, {
+      field,
+      label,
+      value: cleanValue,
+      count: 1,
+      watchSeconds: Number(sourceItem.totalWatchSeconds || 0),
+      lastSeenAt: new Date(sourceItem.lastSeenAt || 0).getTime()
+    });
+  }
+
+  function buildSearchSuggestions(items, query) {
+    const fragment = getActiveSearchFragment(query);
+    const value = fragment.value.trim();
+    if (!value && fragment.field === "any") {
+      return [];
+    }
+
+    const fieldGroups = {
+      title: ["title", "titel", "stream"],
+      game: ["game", "games", "spiel", "kategorie", "category"],
+      tag: ["tag", "tags"],
+      channel: ["channel", "kanal", "name"]
+    };
+    const fieldLabels = {
+      title: "title",
+      game: "game",
+      tag: "tag",
+      channel: "channel"
+    };
+    const selectedFields = Object.entries(fieldGroups)
+      .filter(([, aliases]) => fragment.field === "any" || aliases.includes(fragment.field))
+      .map(([field]) => field);
+    const suggestions = new Map();
+
+    for (const item of items) {
+      if (selectedFields.includes("channel")) {
+        addSuggestionValue(suggestions, "channel", "channel", getDisplayName(item), item);
+        addSuggestionValue(suggestions, "channel", "channel", getChannelSlug(item), item);
+      }
+      if (selectedFields.includes("title")) {
+        addSuggestionValue(suggestions, "title", "title", item.lastStreamTitle, item);
+      }
+      if (selectedFields.includes("game")) {
+        for (const category of getRecentCategories(item)) {
+          addSuggestionValue(suggestions, "game", "game", category.name, item);
+        }
+      }
+      if (selectedFields.includes("tag")) {
+        for (const tag of getRecentTags(item)) {
+          addSuggestionValue(suggestions, "tag", "tag", tag.name, item);
+        }
+      }
+    }
+
+    return Array.from(suggestions.values())
+      .filter((suggestion) => {
+        return !value || suggestion.value.toLowerCase().includes(value);
+      })
+      .sort((a, b) => {
+        return b.count - a.count || b.watchSeconds - a.watchSeconds || b.lastSeenAt - a.lastSeenAt || a.value.localeCompare(b.value);
+      })
+      .slice(0, 8)
+      .map((suggestion) => ({
+        ...suggestion,
+        label: fieldLabels[suggestion.field] || suggestion.label
+      }));
   }
 
   function parseDurationToSeconds(value) {
@@ -1445,6 +1589,7 @@
         <div class="twh-history-toolbar">
           <div class="twh-history-search-wrap">
             <input class="twh-history-search" type="search" placeholder="Suche: kanal, title:, game:, tag:, sessions:, after:" autocomplete="off" aria-label="History durchsuchen">
+            <div class="twh-history-autocomplete" role="listbox" aria-label="Autocomplete" hidden></div>
             <div class="twh-history-suggestions" aria-label="Suchvorschläge">
               <button type="button" data-token="title:">title:</button>
               <button type="button" data-token="game:">game:</button>
@@ -1478,8 +1623,34 @@
     const items = await requestHistory();
     const grid = historyPanel.querySelector(".twh-history-grid");
     const searchInput = historyPanel.querySelector(".twh-history-search");
+    const autocomplete = historyPanel.querySelector(".twh-history-autocomplete");
     const suggestions = historyPanel.querySelector(".twh-history-suggestions");
     const sortSelect = historyPanel.querySelector(".twh-history-sort");
+
+    function updateAutocomplete() {
+      const query = searchInput.value;
+      const autocompleteItems = buildSearchSuggestions(items, query);
+
+      if (autocompleteItems.length === 0) {
+        autocomplete.hidden = true;
+        autocomplete.innerHTML = "";
+        return;
+      }
+
+      autocomplete.innerHTML = autocompleteItems
+        .map((suggestion) => {
+          const countLabel = suggestion.count === 1 ? "1 Kanal" : `${suggestion.count} Kanäle`;
+          return `
+            <button type="button" role="option" data-field="${escapeHtml(suggestion.field)}" data-value="${escapeHtml(suggestion.value)}">
+              <span class="twh-history-autocomplete-field">${escapeHtml(suggestion.label)}:</span>
+              <span class="twh-history-autocomplete-value">${escapeHtml(suggestion.value)}</span>
+              <span class="twh-history-autocomplete-count">${escapeHtml(countLabel)}</span>
+            </button>
+          `;
+        })
+        .join("");
+      autocomplete.hidden = false;
+    }
 
     function paint() {
       const query = searchInput.value.trim().toLowerCase();
@@ -1573,7 +1744,35 @@
         .join("");
     }
 
-    searchInput.addEventListener("input", paint);
+    searchInput.addEventListener("input", () => {
+      paint();
+      updateAutocomplete();
+    });
+    searchInput.addEventListener("focus", updateAutocomplete);
+    searchInput.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        autocomplete.hidden = true;
+      }, 140);
+    });
+    autocomplete.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    autocomplete.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-field][data-value]");
+      if (!button) {
+        return;
+      }
+
+      searchInput.value = replaceActiveSearchFragment(searchInput.value, {
+        field: button.dataset.field,
+        value: button.dataset.value
+      });
+      searchInput.focus();
+      const cursorPosition = searchInput.value.length;
+      searchInput.setSelectionRange(cursorPosition, cursorPosition);
+      autocomplete.hidden = true;
+      paint();
+    });
     suggestions.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-token]");
       if (!button) {
@@ -1587,6 +1786,7 @@
       const cursorPosition = searchInput.value.length;
       searchInput.setSelectionRange(cursorPosition, cursorPosition);
       paint();
+      updateAutocomplete();
     });
     sortSelect.addEventListener("change", paint);
     paint();

@@ -1,20 +1,14 @@
 # Twitch Watch History Extension
 
-Eine private Browser-Extension für Chrome und Brave, die eine persönliche Twitch-Watch-History im Browser aufbaut.
+Private Chrome/Brave-Extension, die lokal eine Watch-History fuer Twitch-Kanaele aufbaut.
 
-Die Extension erkennt besuchte Twitch-Kanäle, zählt grob die aktive Watchtime und ergänzt die Twitch-Following-Seite um einen eigenen `History`-Tab. Dort werden zuletzt gesehene Kanäle als Karten angezeigt.
+## Funktion
 
-## Funktionen
-
-- Trackt besuchte Twitch-Kanäle lokal im Browser.
-- Zählt Watchtime, wenn der Twitch-Tab aktiv ist und das Fenster fokussiert ist.
-- Zeigt zuletzt gesehene Kanäle auf einer eigenen History-Seite.
-- Speichert pro Kanal u. a. Watchtime, Sessions, zuletzt gesehen, Streamtitel, Kategorien, Tags, Zuschauerzahl und Live-Status.
-- Nutzt Vorschaubilder aus Twitch oder erzeugt eigene lokale Previews aus dem sichtbaren Stream.
-- Kann Profilbilder, Live-Status, Zuschauerzahl, Tags und Kategorien über die Twitch API aktualisieren.
-- Bietet Suche mit Syntax-Filtern wie `title:`, `game:`, `tag:`, `watch:>30m`, `sessions:>3`, `live:true` und `following:true`.
-- Bietet Sortierung nach zuletzt gesehen, Watchtime, Sessions, Zuschauern, Live-Status, Following, Spiel, Streamtitel und Kanalname.
-- Enthält ein Popup zum Verbinden mit Twitch, Aktualisieren des Live-Status und Löschen der History.
+- Erkennt besuchte Twitch-Kanäle und speichert sie lokal im Browser.
+- Zaehlt grob Watchtime und Sessions, solange der Twitch-Tab aktiv ist.
+- Ergänzt die Twitch-Following-Seite um einen eigenen `History`-Tab.
+- Zeigt gespeicherte Kanaele mit Suche, Sortierung, Streamdaten und Vorschaubildern.
+- Bietet Export, Import und Auto-Backup der lokalen History.
 
 ## Installation
 
@@ -23,27 +17,27 @@ Die Extension erkennt besuchte Twitch-Kanäle, zählt grob die aktive Watchtime 
 3. `chrome://extensions` aufrufen.
 4. Entwicklermodus aktivieren.
 5. `Entpackte Erweiterung laden` anklicken.
-6. Den Ordner `Stream History Extension` auswählen.
+6. Den Ordner `Stream History Extension` auswaehlen.
 
-Nach Änderungen am Code muss die Extension auf `chrome://extensions` über den Aktualisieren-Button neu geladen werden. Bereits offene Twitch-Tabs sollten danach neu geladen werden.
+Nach Code-Aenderungen muss die Extension auf `chrome://extensions` neu geladen werden.
 
 ## Nutzung
 
-1. Einen Twitch-Kanal öffnen und im aktiven Tab laufen lassen.
-2. Die Twitch-Following-Seite öffnen: `https://www.twitch.tv/directory/following`
+1. Einen Twitch-Kanal oeffnen und im aktiven Tab schauen.
+2. `https://www.twitch.tv/directory/following` oeffnen.
 3. Den neuen Tab `History` anklicken.
-4. History durchsuchen, sortieren oder einzelne Kanäle wieder öffnen.
+4. History durchsuchen, sortieren oder Kanaele erneut oeffnen.
 
-Die Extension fügt außerdem einen kleinen Popup-Button in der Browser-Leiste hinzu. Dort kann Twitch OAuth verbunden werden, damit API-Daten wie Live-Status, Zuschauerzahl und Profilbilder aktualisiert werden können.
+Das Popup zeigt eine kurze Zusammenfassung und fuehrt zur Einstellungsseite.
 
 ## Twitch OAuth
 
-Die Twitch Client-ID ist bereits in der Extension hinterlegt. Im Popup muss nur noch `Mit Twitch verbinden` angeklickt werden.
+OAuth ist optional, wird aber für genauere Twitch-API-Daten genutzt: Live-Status, Zuschauerzahlen, Profilbilder und aktuelle Stream-Metadaten.
 
-Die Redirect URL wird im Popup angezeigt und muss in der Twitch Developer Console für die verwendete App hinterlegt sein, falls OAuth noch nicht funktioniert.
+Die Redirect URL wird in den Einstellungen angezeigt und muss in der Twitch Developer Console fuer die verwendete App hinterlegt sein.
 
 ## Disclaimer
 
 Dieses Projekt ist ein privates Lern- und Hilfsprojekt und steht in keiner offiziellen Verbindung zu Twitch.
 
-Code oder Inhalte wurden zur Vereinfachung des Workflows teilweise mit Unterstützung von KI erstellt.
+Code oder Inhalte wurden teilweise mit Unterstuetzung von KI erstellt.

@@ -2,11 +2,16 @@
   "manifest_version": 3,
   "name": "Twitch Watch History",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtsazxumjqCxP3W4DrB1vGXYMkG6ZEcZbUNIpwQkOzrc0SmjSXrQWMN6g6+DQmZsULjc/NYzDEmG6j9SPdKJIMAWptjRuXop50E+ONKsa2hUsYTOyMZHBr3NFySaW8R1Qvz7cJEIIDFRy5aLFtyipV8yoi3dRWZErA1BJKfAyfvssQqTNm2pM7mPjbeWcwvEdEkGystEZ1QFjQKV225U8Vx5i4er5GGW1aNN19wduVkgSvQndhn6SaT+fu+re/p6wbg/4/PekIASBIucBXasgStlOIXiBStxipydnm4pvv/WdkEKzK21xxo91PnJaN6GbFEwBBvCdr5JUudJFHBIW6QIDAQAB",
   "description": "Private lokale Watch-History für Twitch-Kanäle.",
-  "permissions": ["storage", "tabs", "unlimitedStorage", "identity"],
+  "permissions": ["storage", "tabs", "unlimitedStorage", "identity", "downloads", "alarms"],
   "host_permissions": ["https://www.twitch.tv/*", "https://id.twitch.tv/*", "https://api.twitch.tv/*"],
   "background": {
     "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
   },
   "content_scripts": [
     {
